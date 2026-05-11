@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<title>Form Persiapan Event</title>
+<title>Form Persiapan Ballroom</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -14,6 +14,8 @@
   .header { border-bottom: 3px solid #1a1a2e; padding-bottom: 20px; margin-bottom: 28px; display: flex; justify-content: space-between; align-items: flex-end; }
   .header-left h1 { font-family: 'DM Serif Display', serif; font-size: 22pt; color: #1a1a2e; line-height: 1.1; }
   .header-left p { font-size: 9pt; color: #888; margin-top: 4px; }
+  .header-subtitle { font-size: 10.5pt; color: #333; margin-top: 10px; border-bottom: 1px solid #ccc; display: inline-block; min-width: 280px; outline: none; padding: 2px 4px; }
+  .header-subtitle:empty:before { content: 'Nama acara / keterangan tambahan…'; color: #ccc; font-style: italic; }
   .header-right { text-align: right; font-size: 8.5pt; color: #666; line-height: 2.2; }
   .ef { border-bottom: 1px solid #aaa; display: inline-block; min-width: 130px; padding: 0 4px; outline: none; color: #1a1a1a; }
 
@@ -249,13 +251,13 @@
   <!-- HEADER -->
   <div class="header">
     <div class="header-left">
-      <h1>Form Persiapan Event</h1>
-      <p>Dokumen Operasional Internal — F&amp;B &amp; Event</p>
+      <h1>Form Persiapan Ballroom</h1>
+      <p>Dokumen Operasional Internal — Ballroom &amp; Event</p>
+      <div class="header-subtitle" contenteditable="true"></div>
     </div>
     <div class="header-right">
       No. Dokumen &nbsp;<span class="ef" contenteditable="true"></span><br>
-      Tanggal &nbsp;<span class="ef" contenteditable="true"></span><br>
-      Versi &nbsp;<span class="ef" contenteditable="true">1.0</span>
+      Tanggal &nbsp;<span class="ef" contenteditable="true"></span>
     </div>
   </div>
 
@@ -372,6 +374,20 @@
     <button class="add-row-btn no-print" onclick="addRow('alat')">+ Tambah baris</button>
   </div>
 
+  <!-- 4B. KEBUTUHAN PERALATAN BALLROOM -->
+  <div class="section">
+    <div class="section-title">4B — Kebutuhan Peralatan Ballroom</div>
+    <table>
+      <thead><tr>
+        <th class="col-no">#</th>
+        <th>Item Peralatan</th><th>Qty</th><th>Satuan</th><th>Keterangan / Spesifikasi</th><th>Tersedia</th><th>Perlu Order</th><th>✓</th>
+        <th class="col-del no-print"></th>
+      </tr></thead>
+      <tbody id="body-ballroom"></tbody>
+    </table>
+    <button class="add-row-btn no-print" onclick="addRow('ballroom')">+ Tambah baris</button>
+  </div>
+
   <!-- 5. TIM -->
   <div class="section">
     <div class="section-title">5 — Pembagian Tim</div>
@@ -426,7 +442,7 @@
     <div class="sign-box"><div class="role">Mengetahui</div></div>
   </div>
   <div class="footer">
-    <span>Form Persiapan Event — Dokumen Internal</span>
+    <span>Form Persiapan Ballroom — Dokumen Internal</span>
     <span contenteditable="true">_______ / _______ / _______</span>
   </div>
 
@@ -437,12 +453,20 @@
 // TABLE ROWS
 // ══════════════════════════════════════
 const configs = {
-  menu:   { body:'body-menu',   cols:['text','text','text','text','chk','chk'], count:5 },
-  stok:   { body:'body-stok',   cols:['text','text','text','text','text','chk'], count:8 },
-  alat:   { body:'body-alat',   cols:['text','text','text','chk','chk','chk'], count:6 },
-  tim:    { body:'body-tim',    cols:['text','text','text','text'], count:4 },
-  action: { body:'body-action', cols:['text','text','text','chk'], count:6 },
+  menu:     { body:'body-menu',     cols:['text','text','text','text','chk','chk'], count:5 },
+  stok:     { body:'body-stok',     cols:['text','text','text','text','text','chk'], count:8 },
+  alat:     { body:'body-alat',     cols:['text','text','text','chk','chk','chk'], count:6 },
+  tim:      { body:'body-tim',      cols:['text','text','text','text'], count:4 },
+  action:   { body:'body-action',   cols:['text','text','text','chk'], count:6 },
+  ballroom: { body:'body-ballroom', cols:['text','text','text','text','chk','chk','chk'], count:0 },
 };
+const ballroomItems = [
+  'Meja (Round/Rectangle)','Kursi Tamu','Podium / Lecturn','Backdrop / Signage',
+  'Sound System','Microphone Wireless','Microphone Kabel','Proyektor / LED Screen',
+  'Laptop Presentasi','Lampu Dekorasi / Lighting','Genset / Daya Listrik Tambahan',
+  'AC Portable / Kipas','Panggung / Stage','Karpet Merah','Meja Registrasi',
+  'Spanduk / Banner','Dekorasi Bunga / Floral','Taplak Meja','Kursi Sofa VIP','Partisi Ruangan',
+];
 function makeRow(key, num) {
   const cfg = configs[key];
   const tr = document.createElement('tr');
@@ -484,6 +508,13 @@ function renumber(key) {
   });
 }
 Object.keys(configs).forEach(k => { const c=configs[k]; for(let i=0;i<c.count;i++) addRow(k); });
+
+// pre-fill ballroom items
+ballroomItems.forEach((item, i) => {
+  const tr = makeRow('ballroom', i+1);
+  tr.querySelectorAll('.ec')[0].textContent = item;
+  document.getElementById('body-ballroom').appendChild(tr);
+});
 
 // ══════════════════════════════════════
 // CALENDAR
