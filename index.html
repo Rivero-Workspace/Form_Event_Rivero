@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kalkulasi & Lembar Produk Editable</title>
+<!-- Google Fonts: Plus Jakarta Sans -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<!-- Tailwind CSS via CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- Phosphor Icons for minimalist iconography -->
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
+<script>
+tailwind.config = {
+    theme: {
+        extend: {
+            fontFamily: {
+                sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+            },
+            colors: {
+                surface: '#FAFAFA',
+                subtle: '#F1F5F9',
+            }
+        }
+    }
+}
+</script>
+<style>
+/* Styling scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 9999px;
+}
+/* Print Specific Styling */
+@media print {
+    body {
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+        font-size: 11pt;
+    }
+    .no-print {
+        display: none !important;
+    }
+    .print-shadow-none {
+        box-shadow: none !important;
+        border: 1px solid #e2e8f0 !important;
+    }
+    .page-break {
+        page-break-inside: avoid;
+    }
+    input, textarea {
+        border: none !important;
+        background: transparent !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        box-shadow: none !important;
+        resize: none !important;
+    }
+    .upload-placeholder {
+        display: none !important;
+    }
+}
+
+/* Custom Resize Utility for Webkit/Firefox */
+.resize-header-wrapper {
+    resize: horizontal;
+    overflow: hidden;
+    padding-bottom: 2px;
+}
+</style>
+</head>
+<body class="bg-surface text-slate-800 font-sans antialiased min-h-screen pb-16">
+
+<!-- Header App Bar (Actions) -->
+<header class="no-print sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center space-x-2.5">
+            <div class="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                <i class="ph-bold ph-cards"></i>
+            </div>
+            <div>
+                <h1 class="text-sm font-semibold text-slate-900 leading-tight">Product Sheet & Costing Table</h1>
+                <p class="text-xs text-slate-500">Kalkulasi modal, spesifikasi & harga jual</p>
+            </div>
+        </div>
+        <div class="flex items-center flex-wrap gap-2">
+            <!-- File input for Import -->
+            <input type="file" id="importDraftFile" accept=".json" class="hidden" onchange="importDraft(event)">
+            
+            <button onclick="document.getElementById('importDraftFile').click()" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg text-slate-700 bg-slate-100 hover:bg-slate-200 transition">
+                <i class="ph ph-upload-simple text-sm"></i> Import Draft
+            </button>
+            <button id="saveDraftBtn" onclick="saveToStorage(true)" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg text-slate-700 bg-slate-100 hover:bg-slate-200 transition">
+                <i class="ph ph-floppy-disk text-sm"></i> Simpan Draft
+            </button>
+            <button onclick="exportToJSON()" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg text-slate-700 bg-slate-100 hover:bg-slate-200 transition">
+                <i class="ph ph-export text-sm"></i> Export Data
+            </button>
+            <button onclick="resetDataPrompt()" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg text-rose-600 bg-rose-50 hover:bg-rose-100 transition">
+                <i class="ph ph-arrow-counter-clockwise text-sm"></i> Reset
+            </button>
+            <button onclick="window.print()" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium rounded-lg text-white bg-slate-900 hover:bg-slate-800 shadow-sm transition">
+                <i class="ph ph-printer text-sm"></i> Print / Unduh PDF
+            </button>
+        </div>
+    </div>
+</header>
+
+<!-- Container Utama -->
+<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+
+    <!-- Notifikasi Toast -->
+    <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none bg-slate-900 text-white text-xs px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2">
+        <i class="ph-fill ph-check-circle text-emerald-400 text-base"></i>
+        <span id="toastMsg">Data berhasil disimpan otomatis</span>
+    </div>
+
+    <!-- Modal Konfirmasi Hapus/Reset -->
+    <div id="modalOverlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl border border-slate-100 text-center">
+            <div class="w-12 h-12 rounded-full bg-rose-50 text-rose-500 mx-auto flex items-center justify-center text-xl mb-3">
+                <i class="ph-bold ph-warning"></i>
+            </div>
+            <h3 id="modalTitle" class="text-base font-semibold text-slate-900 mb-1">Konfirmasi Reset</h3>
+            <p id="modalDesc" class="text-xs text-slate-500 mb-5 leading-relaxed">Apakah Anda yakin ingin menghapus semua baris data dan mengembalikan ke setelan awal?</p>
+            <div class="flex items-center justify-center gap-2">
+                <button onclick="closeModal()" class="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition">Batal</button>
+                <button id="modalConfirmBtn" class="px-4 py-2 text-xs font-medium bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition shadow-sm">Ya, Lanjutkan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sheet Card Container -->
+    <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm print-shadow-none overflow-hidden transition-all">
+        
+        <!-- Bagian Header Dokumen / Meta Info -->
+        <section class="p-6 sm:p-8 border-b border-slate-100 bg-gradient-to-b from-white to-slate-50/40">
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+                <!-- Judul / Nama Produk Utama -->
+                <div class="md:col-span-6 space-y-1.5">
+                    <label class="text-[11px] font-semibold tracking-wider text-slate-400 uppercase">Judul Dokumen / Nama Koleksi Produk</label>
+                    <input type="text" id="metaDocTitle" class="w-full text-xl sm:text-2xl font-bold text-slate-900 placeholder:text-slate-300 focus:outline-none focus:border-slate-900 border-b border-transparent hover:border-slate-300 transition py-1 bg-transparent" placeholder="Contoh: Rencana Produksi Apparel Summer 2026" oninput="appState.meta.title = this.value; saveToStorage(false)">
+                    <input type="text" id="metaDocSubtitle" class="w-full text-xs text-slate-500 placeholder:text-slate-300 focus:outline-none focus:border-slate-400 border-b border-transparent hover:border-slate-200 transition py-0.5 bg-transparent" placeholder="Catatan tambahan atau deskripsi proyek produk..." oninput="appState.meta.subtitle = this.value; saveToStorage(false)">
+                </div>
+                <!-- PIC, Tanggal, & Jam Pengerjaan -->
+                <div class="md:col-span-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200/60">
+                        <label class="block text-[11px] font-medium text-slate-500 mb-1 flex items-center gap-1.5">
+                            <i class="ph ph-user text-slate-400"></i> Nama Penyusun / PIC
+                        </label>
+                        <input type="text" id="metaPic" class="w-full text-sm font-medium text-slate-800 bg-transparent focus:outline-none focus:ring-0 placeholder:text-slate-300" placeholder="cth. Sarah Amanda" oninput="appState.meta.pic = this.value; saveToStorage(false)">
+                    </div>
+                    <div class="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200/60">
+                        <label class="block text-[11px] font-medium text-slate-500 mb-1 flex items-center gap-1.5">
+                            <i class="ph ph-calendar-blank text-slate-400"></i> Tanggal Dokumen
+                        </label>
+                        <input type="date" id="metaDate" class="w-full text-sm font-medium text-slate-800 bg-transparent focus:outline-none focus:ring-0 cursor-pointer" onchange="appState.meta.date = this.value; saveToStorage(false)">
+                    </div>
+                    <div class="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200/60">
+                        <label class="block text-[11px] font-medium text-slate-500 mb-1 flex items-center gap-1.5">
+                            <i class="ph ph-clock text-slate-400"></i> Jam Pengerjaan
+                        </label>
+                        <input type="text" id="metaTime" class="w-full text-sm font-medium text-slate-800 bg-transparent focus:outline-none focus:ring-0 placeholder:text-slate-300" placeholder="08:00 - 16:00" oninput="appState.meta.time = this.value; saveToStorage(false)">
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tabel Produk & Costing -->
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm border-collapse" id="productsTable">
+                <thead>
+                    <tr class="border-b border-slate-200/80 bg-slate-50 text-[11px] font-semibold tracking-wider text-slate-500 uppercase" id="tableHeadRow">
+                        <!-- Head di-render dinamis oleh JS -->
+                    </tr>
+                </thead>
+                <tbody id="tableBody" class="divide-y divide-slate-100">
+                    <!-- Row items dynamically injected via JS -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Add Row & Quick Stats Footer -->
+        <div class="p-4 sm:p-6 bg-slate-50/40 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="no-print w-full sm:w-auto flex flex-col sm:flex-row gap-2">
+                <button onclick="addRow()" class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-800 bg-white border border-slate-300 hover:bg-slate-50 hover:border-slate-400 shadow-xs transition active:scale-98">
+                    <i class="ph-bold ph-plus text-slate-500"></i> Tambah Item Baru
+                </button>
+                <button onclick="addColumn()" class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-800 bg-white border border-slate-300 hover:bg-slate-50 hover:border-slate-400 shadow-xs transition active:scale-98">
+                    <i class="ph-bold ph-columns text-slate-500"></i> Tambah Kolom
+                </button>
+            </div>
+
+            <!-- Ringkasan Singkat / Summary -->
+            <div class="w-full sm:w-auto flex items-center justify-end gap-6 text-right">
+                <div>
+                    <span class="block text-[11px] font-medium text-slate-400 uppercase tracking-wide">Total Item</span>
+                    <span id="totalItemsCount" class="text-base font-bold text-slate-800">0</span>
+                </div>
+                <div class="h-8 w-px bg-slate-200"></div>
+                <div>
+                    <span class="block text-[11px] font-medium text-slate-400 uppercase tracking-wide">Est. Total Penjumlahan</span>
+                    <span id="totalSumPrice" class="text-base font-bold text-emerald-600">Rp 0</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Catatan Tambahan / Terms Footer (Print ready) -->
+    <div class="mt-8 text-xs text-slate-400 flex flex-col sm:flex-row justify-between items-center gap-2 px-2">
+        <p>Kalkulasi ini bersifat estimasi internal & katalog produk interaktif.</p>
+        <p class="text-slate-400">Dicetak via Sistem Lembar Kerja Mandiri</p>
+    </div>
+
+</main>
+
+<script>
+const STORAGE_KEY = 'editable_product_sheet_v3';
+const defaultInitialData = {
+    meta: {
+        title: "Katalog & Rincian Produk Signature 2026",
+        subtitle: "Spesifikasi material, estimasi modal dan harga ritel konsumen",
+        pic: "Admin Tim Kreatif",
+        date: new Date().toISOString().split('T')[0],
+        time: ""
+    },
+    columns: [
+        { id: 'col_1', name: 'Nama Item', widthClass: 'min-w-[180px]', type: 'title' },
+        { id: 'col_2', name: 'Bahan-Bahan yang Dibutuhkan', widthClass: 'min-w-[220px]', type: 'textarea' },
+        { id: 'col_3', name: 'Range Biaya / Modal', widthClass: 'w-44', type: 'input' },
+        { id: 'col_4', name: 'Harga Jual Customer', widthClass: 'w-44', type: 'currency' }
+    ],
+    items: [
+        {
+            id: 'item_1',
+            image: '',
+            cells: {
+                'col_1': 'Tote Bag Kanvas Premium',
+                'col_2': '• Kain Kanvas Twill 14oz\n• YKK Metal Zipper\n• Tali webbing katun tebal\n• Sablon discharge 2 sisi',
+                'col_3': 'Rp 38.000 - Rp 45.000',
+                'col_4': '85000'
+            }
+        },
+        {
+            id: 'item_2',
+            image: '',
+            cells: {
+                'col_1': 'Ceramic Mug Doff 350ml',
+                'col_2': '• Stoneware Clay kualitas ekspor\n• Pewarna glaze matte hitam\n• Heat curing oven 1200°C',
+                'col_3': 'Rp 22.000 - Rp 27.000',
+                'col_4': '59000'
+            }
+        }
+    ]
+};
+
+let appState = JSON.parse(JSON.stringify(defaultInitialData));
+
+function formatRupiah(number) {
+    if (!number && number !== 0 && number !== '0') return '';
+    const cleanNum = typeof number === 'string' ? number.replace(/[^0-9]/g, '') : number;
+    if (!cleanNum) return '';
+    return new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: 'IDR',
+        maximumFractionDigits: 0
+    }).format(Number(cleanNum));
+}
+
+function unformatRupiah(str) {
+    if (!str) return '';
+    return str.replace(/[^0-9]/g, '');
+}
+
+window.onload = function() {
+    loadFromStorage();
+    renderAll();
+};
+
+function renderAll() {
+    document.getElementById('metaDocTitle').value = appState.meta.title || '';
+    document.getElementById('metaDocSubtitle').value = appState.meta.subtitle || '';
+    document.getElementById('metaPic').value = appState.meta.pic || '';
+    document.getElementById('metaDate').value = appState.meta.date || '';
+    document.getElementById('metaTime').value = appState.meta.time || '';
+    renderTable();
+}
+
+function renderTable() {
+    const thead = document.getElementById('tableHeadRow');
+    const tbody = document.getElementById('tableBody');
+
+    // 1. Render Table Head 
+    let headHtml = `
+        <th scope="col" class="py-3.5 px-3 text-center w-12">No</th>
+        <th scope="col" class="py-3.5 px-4 w-32 sm:w-36">Visual Foto</th>
+    `;
+    appState.columns.forEach((col, colIdx) => {
+        const isLast = colIdx === appState.columns.length - 1;
+        // Penambahan 'resize-header-wrapper' untuk enable draggable width
+        headHtml += `
+            <th scope="col" class="py-3.5 px-4 align-top group relative min-w-[120px]">
+                <div class="resize-header-wrapper flex items-center justify-between gap-1 border-b border-transparent focus-within:border-slate-300 ${col.widthClass}">
+                    <input type="text" class="bg-transparent font-semibold tracking-wider text-[11px] uppercase focus:outline-none placeholder:text-slate-300 w-full min-w-0" value="${escapeHtml(col.name)}" oninput="updateColumnName('${col.id}', this.value)" placeholder="Nama Kolom">
+                    <button onclick="deleteColumnPrompt('${col.id}')" class="no-print text-slate-300 hover:text-rose-500 p-1 opacity-0 group-hover:opacity-100 transition flex-shrink-0" title="Hapus Kolom"><i class="ph-bold ph-x"></i></button>
+                </div>
+                ${isLast ? '<div class="text-[9px] normal-case text-emerald-500 mt-1 font-medium">*Auto-Jumlah (Angka)</div>' : ''}
+            </th>
+        `;
+    });
+    headHtml += `<th scope="col" class="py-3.5 px-3 text-center w-16 no-print">Aksi</th>`;
+    thead.innerHTML = headHtml;
+
+    // 2. Render Table Body
+    tbody.innerHTML = '';
+    if (appState.items.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="${appState.columns.length + 3}" class="py-12 text-center text-slate-400">
+                    <i class="ph ph-folder-open text-3xl mb-2 block text-slate-300"></i>
+                    Belum ada baris produk. Klik tombol <strong>"+ Tambah Item Baru"</strong> di bawah.
+                </td>
+            </tr>`;
+    } else {
+        appState.items.forEach((item, index) => {
+            const tr = document.createElement('tr');
+            tr.className = "hover:bg-slate-50/70 transition-colors group";
+            tr.id = `row-${item.id}`;
+            
+            let rowHtml = `<td class="py-4 px-3 text-center text-xs font-semibold text-slate-400 align-top pt-5">${index + 1}</td>`;
+            
+            rowHtml += `
+                <td class="py-4 px-4 align-top">
+                    <div class="relative w-28 h-28 rounded-xl border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center group/photo">
+                        ${item.image ? `
+                            <img src="${item.image}" alt="Preview" class="w-full h-full object-cover rounded-xl" />
+                            <div class="no-print absolute inset-0 bg-black/40 opacity-0 group-hover/photo:opacity-100 transition-opacity flex items-center justify-center gap-1.5">
+                                <label class="cursor-pointer bg-white/90 hover:bg-white text-slate-800 p-1.5 rounded-lg text-xs shadow-xs transition" title="Ganti Foto">
+                                    <i class="ph-bold ph-pencil-simple"></i>
+                                    <input type="file" accept="image/*" class="hidden" onchange="handleImageUpload(event, '${item.id}')">
+                                </label>
+                                <button type="button" onclick="removeImage('${item.id}')" class="bg-rose-600/90 hover:bg-rose-600 text-white p-1.5 rounded-lg text-xs shadow-xs transition" title="Hapus Foto">
+                                    <i class="ph-bold ph-trash"></i>
+                                </button>
+                            </div>
+                        ` : `
+                            <label class="cursor-pointer w-full h-full flex flex-col items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100/70 transition p-2 text-center">
+                                <i class="ph ph-image-square text-2xl mb-1 text-slate-300"></i>
+                                <span class="text-[10px] font-medium leading-tight">Pilih Foto</span>
+                                <input type="file" accept="image/*" class="hidden" onchange="handleImageUpload(event, '${item.id}')">
+                            </label>
+                        `}
+                    </div>
+                </td>
+            `;
+
+            appState.columns.forEach((col, colIdx) => {
+                const isLast = colIdx === appState.columns.length - 1; 
+                const cellValue = item.cells[col.id] || '';
+
+                if (isLast) {
+                    const formatted = formatRupiah(cellValue);
+                    rowHtml += `
+                        <td class="py-4 px-4 align-top">
+                            <div class="relative flex items-center">
+                                <span class="text-xs text-slate-400 mr-1.5 font-medium">Rp</span>
+                                <input type="text"
+                                    class="w-full text-xs sm:text-sm font-bold text-slate-900 bg-slate-50/70 border border-slate-200 rounded-lg py-1.5 px-2.5 focus:border-slate-800 focus:bg-white focus:outline-none transition"
+                                    placeholder="0" value="${formatted}" oninput="updateDynamicCell('${item.id}', '${col.id}', this, true)">
+                            </div>
+                        </td>
+                    `;
+                } else if (colIdx === 0) {
+                    rowHtml += `
+                        <td class="py-4 px-4 align-top">
+                            <input type="text"
+                                class="w-full text-sm font-semibold text-slate-800 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-slate-800 focus:outline-none transition py-1 placeholder:text-slate-300"
+                                placeholder="cth. Nama Produk..." value="${escapeHtml(cellValue)}" oninput="updateDynamicCell('${item.id}', '${col.id}', this, false)">
+                        </td>
+                    `;
+                } else if (col.type === 'input') {
+                    rowHtml += `
+                        <td class="py-4 px-4 align-top">
+                            <div class="relative">
+                                <input type="text" class="w-full text-xs font-medium text-slate-700 bg-transparent border border-slate-200/60 rounded-lg py-1.5 px-2.5 focus:border-slate-400 focus:outline-none focus:bg-white transition placeholder:text-slate-300"
+                                placeholder="cth. Rp 25.000 - Rp 30.000" value="${escapeHtml(cellValue)}" oninput="updateDynamicCell('${item.id}', '${col.id}', this, false)">
+                            </div>
+                        </td>
+                    `;
+                } else {
+                    // MENGGUNAKAN CLASS 'resize' (bisa dibesar/kecilkan 2 arah) untuk mengubah tinggi baris (Row Height)
+                    rowHtml += `
+                        <td class="py-4 px-4 align-top h-full">
+                            <textarea rows="3"
+                                class="w-full h-full min-h-[80px] text-xs text-slate-600 bg-transparent border border-transparent hover:border-slate-200 focus:border-slate-400 focus:bg-white focus:outline-none rounded-lg p-1.5 transition resize placeholder:text-slate-300 font-normal leading-relaxed"
+                                placeholder="Rincian / spesifikasi..." oninput="updateDynamicCell('${item.id}', '${col.id}', this, false)">${escapeHtml(cellValue)}</textarea>
+                        </td>
+                    `;
+                }
+            });
+
+            rowHtml += `
+                <td class="py-4 px-3 text-center align-top pt-4 no-print">
+                    <button onclick="deleteRowPrompt('${item.id}')" class="text-slate-300 hover:text-rose-500 hover:bg-rose-50 p-2 rounded-lg transition" title="Hapus Baris">
+                        <i class="ph-bold ph-trash-simple text-base"></i>
+                    </button>
+                </td>
+            `;
+            
+            tr.innerHTML = rowHtml;
+            tbody.appendChild(tr);
+        });
+    }
+
+    calculateSummary();
+}
+
+function updateColumnName(colId, val) {
+    const col = appState.columns.find(c => c.id === colId);
+    if (col) {
+        col.name = val;
+        saveToStorage(false);
+    }
+}
+
+function updateDynamicCell(rowId, colId, inputEl, isAutoSumCol) {
+    const item = appState.items.find(i => i.id === rowId);
+    if (item) {
+        let val = inputEl.value;
+        if (isAutoSumCol) {
+            val = unformatRupiah(inputEl.value);
+            inputEl.value = formatRupiah(val);
+        }
+        item.cells[colId] = val;
+        saveToStorage(false);
+        if (isAutoSumCol) calculateSummary();
+    }
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function addColumn() {
+    const newColId = 'col_' + Date.now();
+    const newCol = { id: newColId, name: 'Kolom Baru', widthClass: 'min-w-[150px]', type: 'textarea' };
+    
+    // SANGAT PENTING: Sisipkan kolom sebelum kolom Auto-Sum paling ujung (bukan di ujung)
+    if(appState.columns.length > 0) {
+        appState.columns.splice(appState.columns.length - 1, 0, newCol);
+    } else {
+        appState.columns.push(newCol);
+    }
+    
+    appState.items.forEach(item => { item.cells[newColId] = ''; });
+    renderTable();
+    saveToStorage(false);
+    showToast('Kolom berhasil ditambahkan');
+}
+
+function deleteColumnPrompt(colId) {
+    if (appState.columns.length <= 1) {
+        alertModal("Harus menyisakan setidaknya 1 kolom.");
+        return;
+    }
+    openModal("Hapus Kolom?", "Semua isian data di kolom ini akan terhapus.", () => {
+        appState.columns = appState.columns.filter(c => c.id !== colId);
+        appState.items.forEach(item => { delete item.cells[colId]; });
+        renderTable();
+        saveToStorage(false);
+        showToast("Kolom berhasil dihapus");
+    });
+}
+
+function addRow() {
+    const newId = 'item_' + Date.now();
+    const newCells = {};
+    appState.columns.forEach(c => { newCells[c.id] = ''; });
+    appState.items.push({
+        id: newId,
+        image: '',
+        cells: newCells
+    });
+    renderTable();
+    saveToStorage(false);
+    showToast('Baris baru berhasil ditambahkan');
+}
+
+function handleImageUpload(event, itemId) {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+        alertModal("Ukuran gambar melebihi 2MB. Silakan gunakan gambar yang lebih kecil.");
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const item = appState.items.find(i => i.id === itemId);
+        if (item) {
+            item.image = e.target.result;
+            renderTable();
+            saveToStorage(false);
+            showToast('Foto berhasil dimuat');
+        }
+    };
+    reader.readAsDataURL(file);
+}
+
+function removeImage(itemId) {
+    const item = appState.items.find(i => i.id === itemId);
+    if (item) {
+        item.image = '';
+        renderTable();
+        saveToStorage(false);
+    }
+}
+
+function calculateSummary() {
+    const count = appState.items.length;
+    document.getElementById('totalItemsCount').textContent = count;
+    
+    let sumTotal = 0;
+    if (appState.columns.length > 0) {
+        const lastColId = appState.columns[appState.columns.length - 1].id;
+        appState.items.forEach(i => {
+            const rawVal = i.cells[lastColId];
+            const numVal = Number(unformatRupiah(rawVal));
+            if (numVal && !isNaN(numVal)) {
+                sumTotal += numVal;
+            }
+        });
+    }
+
+    const formattedSum = formatRupiah(sumTotal.toString());
+    document.getElementById('totalSumPrice').textContent = formattedSum || 'Rp 0';
+}
+
+function saveToStorage(notify = false) {
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+        if (notify) showToast("Draft tersimpan ke penyimpanan browser!");
+    } catch (err) {
+        if(notify) alertModal("Gagal simpan! Storage Browser penuh karena file gambar terlalu besar.");
+    }
+}
+
+function loadFromStorage() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+        try {
+            const parsed = JSON.parse(saved);
+            if (parsed && parsed.items && parsed.columns) {
+                appState = parsed;
+            }
+        } catch (e) {}
+    }
+}
+
+function exportToJSON() {
+    saveToStorage(false);
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appState, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `kalkulasi_produk_${new Date().toISOString().slice(0,10)}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    showToast("Data diekspor ke format JSON");
+}
+
+function importDraft(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const parsed = JSON.parse(e.target.result);
+            if (parsed && parsed.columns && parsed.items) {
+                appState = parsed;
+                renderAll();
+                saveToStorage(false);
+                showToast("Berhasil memuat Draft JSON!");
+            } else {
+                alertModal("Format file JSON tidak cocok untuk sistem ini.");
+            }
+        } catch (err) {
+            alertModal("Gagal membaca file JSON.");
+        }
+        event.target.value = '';
+    };
+    reader.readAsText(file);
+}
+
+let toastTimeout;
+function showToast(msg) {
+    const toast = document.getElementById('toast');
+    const toastMsg = document.getElementById('toastMsg');
+    toastMsg.textContent = msg;
+    toast.classList.remove('translate-y-20', 'opacity-0');
+    clearTimeout(toastTimeout);
+    toastTimeout = setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0');
+    }, 2500);
+}
+
+function openModal(title, desc, confirmCallback) {
+    document.getElementById('modalTitle').textContent = title;
+    document.getElementById('modalDesc').textContent = desc;
+    const modal = document.getElementById('modalOverlay');
+    const btn = document.getElementById('modalConfirmBtn');
+    modal.classList.remove('hidden');
+    btn.onclick = function() {
+        confirmCallback();
+        closeModal();
+    };
+}
+
+function alertModal(msg) {
+    document.getElementById('modalTitle').textContent = "Pemberitahuan";
+    document.getElementById('modalDesc').textContent = msg;
+    const modal = document.getElementById('modalOverlay');
+    const btn = document.getElementById('modalConfirmBtn');
+    btn.textContent = "OK";
+    modal.classList.remove('hidden');
+    btn.onclick = function() {
+        closeModal();
+    };
+}
+
+function closeModal() {
+    document.getElementById('modalOverlay').classList.add('hidden');
+}
+
+function deleteRowPrompt(id) {
+    openModal("Hapus Baris Ini?", "Data bahan dan harga untuk item ini akan dihapus dari tabel.", () => {
+        appState.items = appState.items.filter(i => i.id !== id);
+        renderTable();
+        saveToStorage(false);
+        showToast("Item berhasil dihapus");
+    });
+}
+
+function resetDataPrompt() {
+    openModal("Reset Semua Data?", "Seluruh data, judul dan foto akan dikembalikan ke data default awal.", () => {
+        localStorage.removeItem(STORAGE_KEY);
+        appState = JSON.parse(JSON.stringify(defaultInitialData));
+        renderAll();
+        showToast("Data berhasil direset");
+    });
+}
+</script>
+</body>
+</html>
